@@ -111,6 +111,8 @@ body.role-admin .nav-gestion,body.role-full .nav-gestion{display:flex}
 .backrow{display:flex;align-items:center;gap:10px;margin-bottom:14px;color:#9a9285;font-size:13px}
 .backrow:hover{color:#3a352c}
 .client-header{background:#fff;border:1px solid #ece6d8;border-radius:10px;padding:18px;margin-bottom:16px}
+.ch-back{background:none;border:0;padding:0 0 10px;color:#8a8375;font:inherit;font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer}
+.ch-back i{font-size:10px}
 .client-header .cname{font-family:'Cormorant Garamond',serif;font-size:26px;margin-bottom:6px;color:#3a352c}
 .client-header .cinfo{color:#8a8375;font-size:13px;line-height:1.7}
 .client-header .cactions{display:flex;gap:10px;margin-top:12px}
@@ -1107,6 +1109,27 @@ const SNAP_META = {includeMetadataChanges:true};
 function snapIncierto(snap){ return snap.empty && snap.metadata && snap.metadata.fromCache; }
 function closeModal(id){ document.getElementById(id).classList.add('hidden'); }
 function openModal(id){ document.getElementById(id).classList.remove('hidden'); }
+// Botón/gesto "atrás" del celular (la app instalada no tiene barra del navegador): cierra la ventana abierta,
+// o desde cualquier pantalla vuelve a Clientas; estando en Clientas sale de la app como siempre.
+let _navGuard = false;
+function pantallaActual(){ const s = document.querySelector('.screen:not(.hidden)'); return s ? s.id.replace('screen-','') : ''; }
+function navGuardOn(){ if(_navGuard) return; _navGuard = true; try{ history.pushState({vk:1}, ''); }catch(e){} }
+// Se arma con el primer toque (Chrome ignora las entradas de historial creadas sin interacción del usuario).
+document.addEventListener('pointerdown', ()=>{ const p = pantallaActual(); if(p && p!=='login' && p!=='splash') navGuardOn(); }, true);
+window.addEventListener('popstate', ()=>{
+  if(!_navGuard) return;
+  const p = pantallaActual();
+  if(!p || p==='login' || p==='splash'){ _navGuard = false; return; }
+  const abiertos = [...document.querySelectorAll('.modal-overlay:not(.hidden)')];
+  if(abiertos.length){
+    const m = abiertos[abiertos.length-1], x = m.querySelector('.modal-close');
+    if(x) x.click(); else m.classList.add('hidden');
+    try{ history.pushState({vk:1}, ''); }catch(e){}
+    return;
+  }
+  if(p!=='clientas'){ goBackToClientas(); try{ history.pushState({vk:1}, ''); }catch(e){} return; }
+  _navGuard = false; history.back();
+});
 
 /* =================== AUTH =================== */
 function doLogin(){
@@ -1459,6 +1482,7 @@ function renderClientHeader(){
   const c = currentClienteData;
   document.getElementById('client-header-box').innerHTML = `
     <div class="client-header">
+      <button class="ch-back" onclick="goBackToClientas()"><i class="fa-solid fa-chevron-left"></i> Clientas</button>
       <div class="ch-top">
         <div class="cname">${esc(c.nombre)} ${esc(c.apellido)}</div>
         ${c.telefono? `<a class="ch-wa" href="${waLink(c.telefono)}" target="_blank"><i class="fa-brands fa-whatsapp"></i></a>` : ''}
