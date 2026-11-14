@@ -3,7 +3,7 @@
   "short_name": "vaskas",
   "start_url": "./",
   "scope": "./",
-  "display": "browser",
+  "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#ffffff",
   "icons": [
