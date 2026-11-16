@@ -381,30 +381,42 @@ table.sheet-table tbody td.tot-cell{font-weight:700}
 .eg-estado.pag{background:#d9f0e1;color:#2f6b45}
 .eg-fp{font-family:'Montserrat',sans-serif;min-width:0}
 .modal-eg{max-width:1040px}
-.eg-line{display:flex;flex-wrap:wrap;gap:6px;align-items:center;border:1px solid #ece6d8;border-radius:10px;padding:8px 10px;margin-bottom:8px;background:#fcfbf8}
+.eg-line{display:flex;flex-wrap:wrap;gap:6px;align-items:center;border:1px solid #ece6d8;border-radius:9px;padding:6px 8px;margin-bottom:6px;background:#fcfbf8}
 .eg-line .field{margin-bottom:0;min-width:0}
-.eg-line input,.eg-line select{padding:9px 7px;font-size:13px}
-.eg-cod{flex:0 0 68px}
-.eg-cli{flex:1 1 120px}
-.eg-tp{flex:0 0 96px}
-.eg-tipo{font-weight:500}
+.eg-line input,.eg-line select{height:32px;padding:0 7px;font-size:12.5px;border-radius:7px;text-overflow:ellipsis}
+.eg-cod{flex:0 0 54px}
+.eg-cli{flex:1 1 0}
+.eg-tp{flex:0 0 62px}
+.eg-tipo{display:none}
+.eg-sw{position:relative;display:flex;width:100%;height:32px;border-radius:16px;background:#f1ede2;border:1px solid #e3dccb;padding:2px;font-size:11.5px;font-weight:600;color:#8a8375;cursor:pointer;user-select:none}
+.eg-sw span{flex:1;text-align:center;line-height:26px;position:relative;z-index:2}
+.eg-sw::before{content:'';position:absolute;top:2px;bottom:2px;width:calc(50% - 2px);border-radius:14px;left:2px;background:#f1e6fb;box-shadow:0 1px 2px rgba(0,0,0,.18);z-index:1;transition:left .15s,background .15s}
+.eg-sw.a::before{left:50%;background:#fbe4ee}
+.eg-sw.n span:first-child{color:#7a4f9c}
+.eg-sw.a span:last-child{color:#b35c85}
 .eg-tipo[data-prov="Telas"]{color:#6f8fb3;border-color:#c9d9ec;background:#f6f9fd}
 .eg-tipo[data-prov="Rufina nuevo"]{color:#7a4f9c;border-color:#cdb6e0;background:#f8f4fb}
 .eg-tipo[data-prov="Rufina arreglos"]{color:#b35c85;border-color:#efc3d6;background:#fdf5f8}
-.eg-pren{flex:1 1 150px}
-.eg-det{flex:1.3 1 150px}
-.eg-c{flex:0 0 58px}
-.eg-v{flex:0 0 90px}
+.eg-pren{flex:1 1 0}
+.eg-det{flex:1.3 1 0}
+.eg-c{flex:0 0 44px}
+.eg-v{flex:0 0 78px}
 .eg-c input{text-align:center;padding-left:4px;padding-right:4px}
 .eg-v input{text-align:right}
 .eg-line .rm-row{flex:0 0 22px;text-align:center}
 .eg-top{display:flex;align-items:flex-end;gap:14px;margin:0 0 12px}
-.eg-top .field{margin:0;width:150px;flex:none}
-.eg-mini-row{display:flex;gap:6px;align-items:center;height:38px}
+.eg-top .field{margin:0;width:140px;flex:none}
+.modal-eg{padding:16px 18px 14px}
+.modal-eg h2{margin-bottom:10px}
+.modal-eg .eg-top input,.modal-eg .eg-top select{height:32px;padding:0 8px;font-size:12.5px}
+.modal-eg .add-row-btn{margin:4px 2px}
+.modal-eg .live-total{margin:6px 0 4px}
+.eg-mini-row{display:flex;gap:6px;align-items:center;height:32px}
 .eg-bottom{margin:6px 0 12px}
 .eg-bottom .eg-mini-row{order:0}
 .estado-toggle.mini{flex:none;padding:5px 13px;font-size:11.5px;font-weight:500;border-radius:999px;cursor:pointer}
-.eg-otro .eg-det{flex:1 1 200px}
+.eg-otro .eg-det{flex:1 1 0}
+@media(max-width:600px){.eg-v{flex:0 0 66px}.eg-sub{flex:0 0 54px;font-size:11.5px}.eg-line{gap:4px;padding:6px}.eg-cod{flex:0 0 48px}}
 .eg-otro .eg-sg{flex:0 0 96px}
 #eg-otros .eg-line{margin-bottom:8px}
 .eg-modos{margin:0}
@@ -468,7 +480,7 @@ table.sheet-table tbody td.tot-cell{font-weight:700}
   .gx-conceptos-btn{position:static;transform:none;margin-left:2px;padding:6px 9px;font-size:10.5px;flex:none;white-space:nowrap}
 }
 .estado-toggle.sel-modo{background:#f0e6d0;border-color:#c9a86a;color:#8f6c2a}
-.eg-sub{flex:0 0 78px;text-align:right;font-size:13px;color:#8a8375;white-space:nowrap}
+.eg-sub{flex:0 0 64px;text-align:right;font-size:13px;color:#8a8375;white-space:nowrap}
 .eg-sub b{color:#3a352c}
 .eg-stat{flex:1 0 100%;font-size:11px;min-height:0;margin:-2px 0 0 2px;color:#4f8f68}
 .eg-stat.err{color:#c1685c}
@@ -3154,9 +3166,10 @@ const METODO_SHEET_LABEL = {EFVO_ARS:'Efectivo', EFVO_USD:'Efectivo', TRBF:'Tran
 // (esos se muestran como su propio movimiento "Salda c/c" en la planilla).
 // Punto de venta como "pastilla" de color (si la venta tiene varios puntos de venta, una por cada uno)
 const PV_CLASES = {'Belgrano':'pvc-belgrano','Salda c/c':'pvc-saldacc','CC':'pvc-cc','Venta por señar':'pvc-senar','Préstamo':'pvc-prestamo'};
+const PV_CORTO = {'Venta por señar':'Vta x señar'};  // texto corto en la pastilla de la planilla (el valor guardado no cambia)
 function pvChipsHTML(pv){
   return String(pv||'').split(' + ').map(x=>x.trim()).filter(Boolean)
-    .map(x=>`<span class="pv-chip ${PV_CLASES[x]||''}">${esc(x)}</span>`).join('');
+    .map(x=>`<span class="pv-chip ${PV_CLASES[x]||''}">${esc(PV_CORTO[x]||x)}</span>`).join('');
 }
 function ventaMetodoCellHTML(d){
   const classes = {EFVO_ARS:'metodo-efvo',EFVO_USD:'metodo-efvo',TRBF:'metodo-transf',TRBF_USD:'metodo-transf',TRVF:'metodo-naranja',TARJ:'metodo-naranja'};
@@ -3600,7 +3613,18 @@ function egInferirTipo(row){
   const pr = (v.productos||[])[parseInt(sel.value,10)];
   return pr && pr.esArreglo ? 'Rufina arreglos' : 'Rufina nuevo';
 }
-function egPintaTipo(sel){ sel.dataset.prov = sel.value; }
+function egPintaTipo(sel){
+  sel.dataset.prov = sel.value;
+  const sw = sel.parentElement && sel.parentElement.querySelector('.eg-sw');
+  if(sw){ const a = sel.value==='Rufina arreglos'; sw.classList.toggle('a', a); sw.classList.toggle('n', !a); }
+}
+// Llave Nuevo | Arreglo: un toque la pasa de un lado al otro (el valor real vive en el select oculto .eg-tipo)
+document.getElementById('eg-lineas').addEventListener('click', e=>{
+  const sw = e.target.closest && e.target.closest('.eg-sw'); if(!sw) return;
+  const sel = sw.parentElement.querySelector('.eg-tipo');
+  sel.value = sel.value==='Rufina arreglos' ? 'Rufina nuevo' : 'Rufina arreglos';
+  sel.dispatchEvent(new Event('change',{bubbles:true}));
+});
 document.getElementById('eg-lineas').addEventListener('change', e=>{ if(e.target.classList.contains('eg-tipo')) egPintaTipo(e.target); });
 function egAplicarTipo(row, inferir){
   const modo = egModo(), sel = row.querySelector('.eg-tipo'), wrap = sel.closest('.eg-tp');
@@ -3678,8 +3702,8 @@ function addEgresoLinea(l){
     <div class="field eg-cod"><input class="eg-codigo" placeholder="Código" inputmode="numeric" value="${esc(l.codigo||'')}"></div>
     <div class="field eg-cli"><input class="eg-clienta" placeholder="Clienta" value="${esc(l.clienta||'')}"></div>
     <div class="field eg-pren"><select class="eg-prenda-sel hidden"></select><input class="eg-prenda-txt" placeholder="Prenda (según código)" readonly tabindex="-1" value="${esc(l.prenda||'')}"></div>
-    <div class="field eg-tp"><select class="eg-tipo"></select></div>
     <div class="field eg-det"><input class="eg-detalle" placeholder="Detalle" value="${esc(l.detalle||'')}"></div>
+    <div class="field eg-tp"><select class="eg-tipo"></select><div class="eg-sw n" title="Nuevo / Arreglo (tocá para cambiar)"><span>N</span><span>A</span></div></div>
     <div class="field eg-c"><input class="eg-cant" placeholder="Cant." inputmode="decimal" value="${esc(String(l.cant==null?'':l.cant).replace('.',','))}"></div>
     <div class="field eg-v"><input class="eg-valor" placeholder="Valor $" inputmode="numeric" value="${l.valor===0 ? '0' : fmtMoney(l.valor)}"></div>
     <div class="eg-sub" title="Total de la línea"><b>$0</b></div>
@@ -3710,7 +3734,7 @@ function addEgresoLinea(l){
 }
 // Tab en el formulario de Telas/Arreglos: baja por la columna (todos los códigos, después todas las prendas, detalles, etc.)
 // y recién al terminar una columna pasa a la siguiente. Shift+Tab hace el camino inverso.
-const EG_TAB_COLS = ['codigo','clienta','prenda','tipo','detalle','cant','valor'];
+const EG_TAB_COLS = ['codigo','clienta','prenda','detalle','tipo','cant','valor'];
 function egColEl(row, ci){
   const k = EG_TAB_COLS[ci];
   if(k==='prenda'){ const sl=row.querySelector('.eg-prenda-sel'), tx=row.querySelector('.eg-prenda-txt'); return sl.classList.contains('hidden')? tx : sl; }
