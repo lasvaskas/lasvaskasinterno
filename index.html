@@ -910,7 +910,7 @@ body.role-admin .doctype-btns button.pago{display:block}
     </div>
     <div id="gx-pend" class="gx-pend hidden"></div>
     <div class="field"><label>Detalle</label><input id="gx-detalle" placeholder=""></div>
-    <div class="field"><label>Monto</label><input id="gx-monto" inputmode="numeric" placeholder="$" oninput="gxMediosRecalc()"></div>
+    <div class="field"><label id="gx-monto-lbl">Monto</label><input id="gx-monto" inputmode="numeric" placeholder="$" oninput="gxMediosRecalc()"></div>
     <div class="field"><label>Medio de pago</label>
       <div id="gx-medios"></div>
       <div class="add-row-btn" style="margin:2px 0 0" onclick="addGxMedio()"><i class="fa-solid fa-plus"></i> Otro medio de pago</div>
@@ -3935,6 +3935,8 @@ function openGastosSheet(){
 // Filas del mes: los egresos cargados + una fila automática "Compra telas" por cada registro de Telas/Arreglos ya pagado (con su fecha de pago)
 function gastosFilas(){
   const filas = gastosAll.map(g=>({id:g.id, fecha:g.fecha, concepto:g.concepto||'', detalle:g.detalle||'', monto:g.monto||0, medios:gxMediosDe(g), createdAt:g.createdAt||0, auto:false}));
+  // Egreso pagado solo en dólares (medio USD): su monto está en usd, no en pesos
+  filas.forEach(f=>{ f.usd = f.medios.length>0 && f.medios.every(m=>m.medio==='USD'); });
   egresosAll.forEach(e=>{
     if(e.estado!=='pagado' || !e.fechaPago || esRegistroRufina(e)) return;
     filas.push({id:'auto-'+e.id, egresoId:e.id, fecha:e.fechaPago, concepto:CONCEPTO_TELAS, detalle:'', monto:egTotal(e), medios:(e.medioPago? [{medio:e.medioPago, monto:egTotal(e)}] : []), createdAt:e.createdAt||0, auto:true});
@@ -3947,7 +3949,7 @@ function gxColText(f,col){
     case 'fecha': return `${fmtDateSheet(f.fecha)} ${fmtDate(f.fecha)}`;
     case 'concepto': return f.concepto;
     case 'detalle': return f.detalle;
-    case 'monto': return String(f.monto);
+    case 'monto': return f.usd ? 'usd '+f.monto : String(f.monto);
     case 'medio': return f.medios.map(m=>m.medio).join(' ');
   }
   return '';
@@ -3961,16 +3963,18 @@ function applyGastosFilters(){
     return !q || normalize(gxColText(f,col)).includes(q);
   }));
   renderGastosSheet(filtered);
-  const tot = arr => r2(arr.reduce((t,f)=>t+f.monto,0));
+  const tot = arr => r2(arr.filter(f=>!f.usd).reduce((t,f)=>t+f.monto,0));
+  const totU = arr => r2(arr.filter(f=>f.usd).reduce((t,f)=>t+f.monto,0));
+  const itemU = arr => totU(arr)>0 ? `<div class="sf-item"><span class="sf-l">Total usd</span><b>${fmtUSD(totU(arr))}</b></div>` : '';
   const porConcepto = {};
-  delMes.forEach(f=>{ porConcepto[f.concepto] = r2((porConcepto[f.concepto]||0) + f.monto); });
+  delMes.filter(f=>!f.usd).forEach(f=>{ porConcepto[f.concepto] = r2((porConcepto[f.concepto]||0) + f.monto); });
   document.getElementById('gastos-footer').innerHTML = `
     <div class="sf-card">
       <div class="sf-title">Totales en vista filtrada</div>
-      <div class="sf-row"><div class="sf-item"><span class="sf-l">Total</span><b>${fmtARSc(tot(filtered))}</b></div></div>
+      <div class="sf-row"><div class="sf-item"><span class="sf-l">Total</span><b>${fmtARSc(tot(filtered))}</b></div>${itemU(filtered)}</div>
       <div class="sf-sep"></div>
       <div class="sf-title">Resumen del mes · ${esc(monthLabel(gastosMonth))}</div>
-      <div class="sf-row"><div class="sf-item"><span class="sf-l">Total</span><b>${fmtARSc(tot(delMes))}</b><button type="button" class="gx-gbtn" onclick="gxToggleGrafico()">${gxGrafOpen?'▴':'▾'} Detalle por concepto</button></div></div>
+      <div class="sf-row"><div class="sf-item"><span class="sf-l">Total</span><b>${fmtARSc(tot(delMes))}</b></div>${itemU(delMes)}<div class="sf-item"><button type="button" class="gx-gbtn" onclick="gxToggleGrafico()">${gxGrafOpen?'▴':'▾'} Detalle por concepto</button></div></div>
       <div id="gx-graf" class="gx-graf" style="display:${gxGrafOpen?'block':'none'}"></div>
     </div>`;
   // En el gráfico, Honorarios Juli y Monotributo Juli van siempre juntos
@@ -4050,7 +4054,7 @@ function renderGastosSheet(filas){
     const lapiz = f.auto
       ? (puedeEditarEgresos() ? `<span class="sheet-pencil" title="Ver en Telas/Arreglos" onclick="openEgresoModal('${esc(f.egresoId)}')"><i class="fa-solid fa-pen"></i></span>` : '')
       : `<span class="sheet-pencil" onclick="openGastoModal('${esc(f.id)}')"><i class="fa-solid fa-pen"></i></span>`;
-    return `<tr class="${i%2===1?'zebra':''}"><td class="edit-cell">${lapiz}</td><td>${fmtDateSheet(f.fecha)}</td><td class="${gxNegrita(f)?'gx-bold':''}">${esc(f.concepto)}${f.auto?'<span class="gx-auto">automático</span>':''}</td><td class="prod-cell">${esc(f.detalle)}</td><td class="${gxNegrita(f)?'gx-bold':''}">${fmtARSc(f.monto)}</td><td class="medio-chips">${f.medios.map(m=>`<span class="medio-chip medio-${normalize(m.medio)}">${esc(m.medio)}${f.medios.length>1 ? ' '+fmtARSc(m.monto) : ''}</span>`).join('')}</td></tr>`;
+    return `<tr class="${i%2===1?'zebra':''}"><td class="edit-cell">${lapiz}</td><td>${fmtDateSheet(f.fecha)}</td><td class="${gxNegrita(f)?'gx-bold':''}">${esc(f.concepto)}${f.auto?'<span class="gx-auto">automático</span>':''}</td><td class="prod-cell">${esc(f.detalle)}</td><td class="${gxNegrita(f)?'gx-bold':''}">${f.usd ? fmtUSD(f.monto) : fmtARSc(f.monto)}</td><td class="medio-chips">${f.medios.map(m=>`<span class="medio-chip medio-${normalize(m.medio)}">${esc(m.medio)}${f.medios.length>1 ? ' '+fmtARSc(m.monto) : ''}</span>`).join('')}</td></tr>`;
   }).join('');
 }
 
@@ -4132,14 +4136,22 @@ function addGxMedio(m){
   const cont = document.getElementById('gx-medios');
   cont.appendChild(row);
   row.querySelector('.gx-msel').value = m.medio||'';
+  row.querySelector('.gx-msel').addEventListener('change', gxMontoMoneda);
   const mm = row.querySelector('.gx-mmonto'); mm.value = m.monto ? fmtMoneyDec(m.monto) : '';
   attachMoneyDecInput(mm);
   mm.addEventListener('input', ()=>gxMediosRecalc(row));
-  row.querySelector('.rm-row').addEventListener('click', ()=>{ row.remove(); gxMediosRecalc(); });
+  row.querySelector('.rm-row').addEventListener('click', ()=>{ row.remove(); gxMediosRecalc(); gxMontoMoneda(); });
   const rows = cont.querySelectorAll('.gx-medio-row');
   if(rows.length===1) rows[0].querySelector('.gx-msel').id = 'gx-medio'; // el primero es "el" medio de pago cuando hay uno solo
   else if(!m.monto){ gxMediosRecalc(); }
   return row;
+}
+// Si el único medio de pago es USD, el monto se carga en dólares
+function gxMontoMoneda(){
+  const sels = [...document.querySelectorAll('#gx-medios .gx-msel')];
+  const usd = sels.length===1 && sels[0].value==='USD';
+  const l = document.getElementById('gx-monto-lbl'); if(l) l.textContent = usd ? 'Monto (en dólares)' : 'Monto';
+  const m = document.getElementById('gx-monto'); if(m) m.placeholder = usd ? 'usd' : '$';
 }
 // Con más de un medio, el primero se completa solo con lo que falta para llegar al monto total
 function gxMediosRecalc(editada){
@@ -4175,6 +4187,7 @@ function openGastoModal(id){
   (ms.length ? ms : [{}]).forEach(m=>addGxMedio(m));
   const mo = document.getElementById('gx-monto'); mo.value = g? fmtMoneyDec(g.monto) : '';
   if(!mo._money){ attachMoneyDecInput(mo); mo._money = true; }
+  gxMontoMoneda();
   document.getElementById('gx-pend').classList.add('hidden');
   document.getElementById('gx-delete-row').classList.toggle('hidden', !g);
   openModal('modal-gasto');
