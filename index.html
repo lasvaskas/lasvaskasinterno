@@ -340,6 +340,13 @@ body.role-limited #venta-table colgroup col:nth-child(9){display:none}
 }
 /* botones "+ Prenda" / "+ Arreglos/otros" */
 .add-pills{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 14px}
+.pg-det{margin:0 0 10px;border-top:1px solid #efe9da;padding-top:8px}
+.pg-det summary{cursor:pointer;font-size:12.5px;color:#8a8375;list-style:none;display:flex;align-items:center;gap:6px;padding:2px 0;user-select:none}
+.pg-det summary::-webkit-details-marker{display:none}
+.pg-det summary::before{content:'▸';font-size:11px;color:#8f6c2a;transition:transform .15s;display:inline-block}
+.pg-det[open] summary::before{transform:rotate(90deg)}
+.pg-det summary small{font-size:11px;color:#a9a191}
+.pg-det input{margin-top:8px}
 .add-pill{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:16px;border:none;font-size:12px;font-weight:600;cursor:pointer;background:#f4ecd9;color:#8f6c2a}
 .add-pill.hidden{display:none}
 .pago-line{border-top:1px dashed #e3d9c2;margin-top:6px;padding-top:10px;position:relative}
@@ -852,11 +859,11 @@ body.role-admin .doctype-btns button.pago{display:block}
     <input type="hidden" id="pago-editing-id">
     <div class="field" id="pago-doc-select-field"><label>Saldar deuda del</label><select id="pago-doc-select"></select></div>
     <div class="field" id="pago-fecha-field"><label>Fecha del pago</label><input type="date" id="pago-fecha-input"></div>
-    <div class="field"><label>Método de pago</label><select id="pago-metodo-select"></select></div>
     <div class="field"><label>Monto</label><input id="pago-monto-input" placeholder="Monto"></div>
-    <div class="field"><label>Cotización (solo si pagás en una moneda distinta a la de la deuda)</label><input id="pago-cotizacion-input" placeholder="ej: 1350"></div>
+    <div class="field"><label>Método de pago</label><select id="pago-metodo-select"></select></div>
+    <details class="pg-det" id="pago-cot-det"><summary>Cotización <small>(solo si pagás en una moneda distinta a la de la deuda)</small></summary><input id="pago-cotizacion-input" placeholder="ej: 1350"></details>
+    <details class="pg-det" id="pago-nota-det"><summary>Nota <small>(opcional, se ve en el detalle de Movimientos)</small></summary><input id="pago-nota-input" maxlength="200" placeholder="ej: solo ingresó plata"></details>
     <div id="pago-extra-lines"></div>
-    <div class="field"><label>Nota (opcional, se ve en el detalle de Movimientos)</label><input id="pago-nota-input" maxlength="200" placeholder="ej: solo ingresó plata"></div>
     <div class="add-pills" id="pago-add-row"><button type="button" class="add-pill" onclick="addPagoLine()"><i class="fa-solid fa-plus"></i> Otro método de pago</button></div>
     <button class="btn btn-primary" id="pago-save-btn" style="width:100%" onclick="savePago()">Guardar pago</button>
     <div id="pago-delete-row" class="hidden" style="text-align:center;margin-top:14px">
@@ -2193,6 +2200,18 @@ function editCurrentDoc(){
 const PAGO_LIBRE = '__libre__';
 function syncPagoFecha(){
   const libre = document.getElementById('pago-doc-select').value===PAGO_LIBRE;
+  pagoSugerirMonto();
+}
+// El monto sugerido (lo que debe esa venta) se muestra en gris claro dentro del casillero; no se carga solo
+function pagoSugerirMonto(){
+  const inp = document.getElementById('pago-monto-input');
+  const d = docsCache.find(x=>x.id===document.getElementById('pago-doc-select').value);
+  let txt = 'Monto';
+  if(d && !document.getElementById('pago-editing-id').value){
+    if((d.aPagarARS||0)>0) txt = fmtMoney(d.aPagarARS);
+    else if((d.aPagarUSD||0)>0) txt = fmtMoney(d.aPagarUSD);
+  }
+  inp.placeholder = txt;
 }
 // Un pago puede tener varias líneas (ej: parte en efectivo y parte en transferencia). Los pagos viejos tienen una sola (metodo/monto).
 function pagoLineas(p){
@@ -2253,6 +2272,8 @@ function openPagoModal(editPagoId){
   document.getElementById('pago-extra-lines').innerHTML = '';
   document.getElementById('pago-nota-input').value = '';
   document.getElementById('pago-add-row').classList.remove('hidden');
+  document.getElementById('pago-cot-det').open = false; document.getElementById('pago-nota-det').open = false;
+  document.getElementById('pago-monto-input').placeholder = 'Monto';
 
   if(isEdit){
     const p = docsCache.find(x=>x.id===editPagoId);
@@ -2266,6 +2287,8 @@ function openPagoModal(editPagoId){
     document.getElementById('pago-cotizacion-input').value = fmtMoney(ls[0].cotizacion||0);
     ls.slice(1).forEach(l=>addPagoLine(l));
     document.getElementById('pago-nota-input').value = p.nota||'';
+    document.getElementById('pago-cot-det').open = !!(ls[0].cotizacion>0);
+    document.getElementById('pago-nota-det').open = !!p.nota;
     openModal('modal-pago');
     return;
   }
@@ -2412,7 +2435,7 @@ function savePago(){
     }
     const otrosPagos = (d.pagos||[]).filter(p=>p.pagoDocId!==editPagoId);
     const ap = aplicarLineasAVenta(d, otrosPagos, lines, editPagoId);
-    if(ap.error){ alert(ap.error); return; }
+    if(ap.error){ if(/cotizaci/i.test(ap.error)){ const cd=document.getElementById('pago-cot-det'); if(cd) cd.open=true; } alert(ap.error); return; }
     const totals = applyPagosToVenta(d, ap.pagos);
     const updateData = {pagos: ap.pagos, pagadoARS: totals.pagadoARS, pagadoUSD: totals.pagadoUSD, aPagarARS: totals.aPagarARS, aPagarUSD: totals.aPagarUSD};
     if(totals.fullySettled) Object.assign(updateData, saldadoResumen(ap.items, fecha));
@@ -2469,7 +2492,7 @@ function savePago(){
   const d = docsCache.find(x=>x.id===docId);
   if(!d){ alert('No se encontró la venta a saldar.'); return; }
   const ap = aplicarLineasAVenta(d, d.pagos||[], lines, pagoRef.id);
-  if(ap.error){ alert(ap.error); return; }
+  if(ap.error){ if(/cotizaci/i.test(ap.error)){ const cd=document.getElementById('pago-cot-det'); if(cd) cd.open=true; } alert(ap.error); return; }
   const totals = applyPagosToVenta(d, ap.pagos);
   const updateData = {pagos: ap.pagos, pagadoARS: totals.pagadoARS, pagadoUSD: totals.pagadoUSD, aPagarARS: totals.aPagarARS, aPagarUSD: totals.aPagarUSD};
   if(totals.fullySettled) Object.assign(updateData, saldadoResumen(ap.items, fecha));
