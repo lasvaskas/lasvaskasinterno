@@ -68,6 +68,14 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol in ['admin','full'];
     }
 
+    // Historial de cambios de ventas/presupuestos: cualquier usuario del sistema deja registro de lo que edita
+    // (firmado con su propio email); solo el administrador lo puede leer. Nadie lo puede modificar ni borrar.
+    match /historial/{id} {
+      allow create: if esUsuarioDelSistema() && request.resource.data.quien == request.auth.token.email;
+      allow read: if esAdmin();
+      allow update, delete: if false;
+    }
+
     // Todo lo demás, cerrado.
     match /{document=**} {
       allow read, write: if false;

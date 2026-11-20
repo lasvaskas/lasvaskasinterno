@@ -174,6 +174,22 @@ body.role-admin .nav-gestion,body.role-full .nav-gestion{display:flex}
 @media(min-width:700px){.modal{border-radius:14px}}
 .modal-close{position:absolute;top:14px;right:14px;font-size:20px;color:#9a9285;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:50%}
 .modal-close:hover{background:#f2eee3}
+/* Historial de cambios (solo administrador) */
+.hist-link{background:none;border:none;color:#8a6d2f;font-size:13px;cursor:pointer;font-family:inherit;padding:4px 8px;border-radius:8px}
+.hist-link:hover{background:#f7f4ee}
+.hist-sub{font-size:13px;color:#8a8170;margin:-10px 0 14px}
+.hist-item{border:1px solid #eee7d8;border-radius:10px;padding:10px 12px;margin-bottom:10px;background:#fcfbf8}
+.hist-cab{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;font-size:13px;color:#3a352c;margin-bottom:6px}
+.hist-cab span{color:#8a8170;font-size:12px}
+.hist-cab .hist-acc{margin-left:auto;background:#f2eee3;color:#8a6d2f;border-radius:10px;padding:1px 8px;font-size:11px}
+.hist-cambio{font-size:12.5px;padding:4px 0;border-top:1px dashed #eee7d8}
+.hist-cambio:first-of-type{border-top:none}
+.hist-campo{color:#8a8170;font-size:11.5px}
+.hist-val{color:#3a352c;word-break:break-word}
+.hist-antes{color:#a0968a;text-decoration:line-through}
+.hist-flecha{color:#c9a96a}
+.hist-desp{color:#3a352c}
+.hist-vacio{text-align:center;color:#8a8170;font-size:13px;padding:18px 0}
 .modal h2{font-family:'Cormorant Garamond',serif;font-size:22px;margin-bottom:18px;padding-right:30px;color:#3a352c}
 .row2{display:flex;gap:10px}
 .row2>.field{flex:1}
@@ -845,6 +861,9 @@ body.role-admin .doctype-btns button.pago{display:block}
       </div>
     </div>
     <button class="btn btn-primary" id="doc-save-btn" style="width:100%;margin-top:10px" onclick="saveDoc()">Guardar</button>
+    <div id="doc-hist-row" class="hidden" style="text-align:center;margin-top:14px">
+      <button type="button" class="hist-link" onclick="abrirHistorial()"><i class="fa-solid fa-clock-rotate-left"></i> Historial de cambios</button>
+    </div>
     <div id="doc-delete-row" class="hidden" style="text-align:center;margin-top:14px">
       <button class="btn-danger" style="font-size:13px" onclick="deleteDoc()">Eliminar documento</button>
     </div>
@@ -967,6 +986,16 @@ body.role-admin .doctype-btns button.pago{display:block}
     <div id="nota-delete-row" class="hidden" style="text-align:center;margin-top:14px">
       <button class="btn-danger" style="font-size:13px" onclick="deleteNota()">Eliminar nota</button>
     </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: HISTORIAL DE CAMBIOS (solo administrador) ============ -->
+<div id="modal-hist" class="modal-overlay hidden">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-hist')">✕</button>
+    <h2>Historial de cambios</h2>
+    <div id="hist-sub" class="hist-sub"></div>
+    <div id="hist-lista"></div>
   </div>
 </div>
 
@@ -1598,6 +1627,7 @@ function renderDocsList(){
 /* =================== DOC MODAL (crear/editar) =================== */
 function openDocModal(tipo, existing){
   editingDocTipo = tipo;
+  editingExistingDoc = existing? JSON.parse(JSON.stringify(existing)) : null; // copia del original: se conserva lo que el formulario no muestra (costos, factura…) y sirve para el historial
   editingExistingCodigo = existing? (existing.codigo!==undefined? existing.codigo : null) : null;
   editingExistingCreatedAt = existing? (existing.createdAt||null) : null;
   editingExistingSaldarPagos = existing? (existing.pagos||[]).filter(p=>p.pagoDocId) : [];
@@ -1630,13 +1660,14 @@ function openDocModal(tipo, existing){
     const basePV = (productos[0] && productos[0].puntoVenta) || (existing && existing.puntoVenta && existing.puntoVenta.split(' + ')[0]) || 'Belgrano';
     document.getElementById('doc-puntoventa').value = basePV;
     let lastPV = basePV;
-    productos.forEach(p=>{
+    productos.forEach((p,i)=>{
       const pv = p.puntoVenta || lastPV;
       if(pv !== lastPV){ addPVDivider(pv); lastPV = pv; }
       p.esArreglo? addArregloRow(p) : addProductoRow(p);
+      marcarFilaPrenda(i);
     });
   } else {
-    productos.forEach(p=> p.esArreglo? addArregloRow(p) : addProductoRow(p));
+    productos.forEach((p,i)=>{ p.esArreglo? addArregloRow(p) : addProductoRow(p); marcarFilaPrenda(i); });
   }
 
   document.getElementById('pagos-container').innerHTML='';
@@ -1649,8 +1680,19 @@ function openDocModal(tipo, existing){
   recalcLiveTotal();
   recalcDeudaLive();
   document.getElementById('doc-delete-row').classList.toggle('hidden', !existing || currentUserRole!=='admin'); // eliminar ventas y presupuestos: solo el administrador
+  document.getElementById('doc-hist-row').classList.toggle('hidden', !existing || currentUserRole!=='admin'); // historial de cambios: solo el administrador
   openModal('modal-doc');
   document.querySelectorAll('#productos-container textarea').forEach(autoGrow);
+}
+// Cada fila que viene de una prenda ya guardada recuerda cuál era (para no perder sus costos al guardar)
+function marcarFilaPrenda(i){
+  const filas = document.querySelectorAll('#productos-container .prod-row');
+  const f = filas[filas.length-1]; if(f) f.dataset.pidx = String(i);
+}
+function prendaOriginal(row){
+  if(!editingExistingDoc || !row.dataset || row.dataset.pidx===undefined) return {};
+  const p = (editingExistingDoc.productos||[])[parseInt(row.dataset.pidx,10)];
+  return p? p : {};
 }
 function addPVDivider(preset){
   const cont = document.getElementById('productos-container');
@@ -1888,7 +1930,7 @@ function saveDoc(){
       if(!desc) return;
       const moneda = row.querySelector('.ar-moneda').value;
       const total = num(row.querySelector('.ar-valor').value)||0;
-      productos.push({desc, moneda, esArreglo:true, total, puntoVenta: currentPV});
+      productos.push({...prendaOriginal(row), desc, moneda, esArreglo:true, total, puntoVenta: currentPV});
       if(currentPV && !pvsUsadas.includes(currentPV)) pvsUsadas.push(currentPV);
       if(moneda==='ARS') totalARS += total; else totalUSD += total;
       return;
@@ -1899,14 +1941,14 @@ function saveDoc(){
     if(tipo==='presupuesto'){
       const efvo = num(row.querySelector('.pd-efvo').value);
       const tarj = num(row.querySelector('.pd-tarj').value);
-      productos.push({desc, moneda, efvo, tarj});
+      productos.push({...prendaOriginal(row), desc, moneda, efvo, tarj});
       if(moneda==='ARS'){ totalEfvoARS += efvo; totalTarjARS += tarj; }
       else { totalEfvoUSD += efvo; totalTarjUSD += tarj; }
     } else {
       const valorUnit = num(row.querySelector('.pd-valorunit').value)||0;
       const cant = cantDe(row.querySelector('.pd-cant').value, valorUnit);
       const total = cant*valorUnit;
-      productos.push({desc, moneda, cant, valorUnit, total, puntoVenta: currentPV});
+      productos.push({...prendaOriginal(row), desc, moneda, cant, valorUnit, total, puntoVenta: currentPV});
       if(currentPV && !pvsUsadas.includes(currentPV)) pvsUsadas.push(currentPV);
       if(moneda==='ARS') totalARS += total; else totalUSD += total;
     }
@@ -1969,7 +2011,11 @@ function saveDoc(){
     if(tipo==='venta' && codigo!==undefined) data.codigo = codigo;
     const savedId = id || ref.doc().id; // id generado en el cliente: no hace falta esperar al servidor para mostrar el resultado
     const prevD0 = id? docsCache.find(x=>x.id===id) : null;
-    const savedDoc = {id: savedId, ...data, ...((tipo==='presupuesto' && prevD0 && prevD0.convertido)? {convertido:true} : {})};
+    // Al editar se conserva todo lo que el formulario no toca (factura, marca de convertido, etc.)
+    const original = (id && editingExistingDoc && editingExistingDoc.id===id)? editingExistingDoc : (prevD0||null);
+    const conservar = original? (({id:_i, ...r})=>r)(original) : {};
+    const savedDoc = {...conservar, id: savedId, ...data, ...((tipo==='presupuesto' && prevD0 && prevD0.convertido)? {convertido:true} : {})};
+    if(id && original) registrarHistorial(tipo, savedId, currentClienteId, {...original, ...data}, 'Edición', diffDocHistorial(original, data, tipo));
     // Optimista: cerramos el modal y mostramos todo al instante; la escritura real viaja en segundo plano.
     closeModal('modal-doc');
     renderPreview(savedDoc);
@@ -1982,7 +2028,7 @@ function saveDoc(){
     const wb = db.batch();
     if(id) wb.update(ref.doc(id), data); else wb.set(ref.doc(savedId), {...data, createdAt: createdAtDoc});
     const globalRef = db.collection(tipo==='presupuesto'?'presupuestos':'ventas').doc(savedId);
-    const globalData = {...data, id: savedId, createdAt: createdAtDoc, clienteId: currentClienteId, docId: savedId};
+    const globalData = {...conservar, ...data, id: savedId, createdAt: createdAtDoc, clienteId: currentClienteId, docId: savedId};
     // En presupuestos se mezcla (merge) para no perder la marca "convertido" al editar el presupuesto.
     if(tipo==='presupuesto') wb.set(globalRef, globalData, {merge:true}); else wb.set(globalRef, globalData);
     markSaving();
@@ -2017,9 +2063,93 @@ function saveDoc(){
   }
 }
 let editingExistingCodigo = null;
+let editingExistingDoc = null; // el documento tal como estaba al abrir el formulario de edición
 let editingExistingCreatedAt = null; // conserva el orden de carga al editar (también cuando se edita desde la planilla)
 let editingExistingSaldarPagos = []; // pagos que saldan deuda (con pagoDocId) de la venta que se está editando; no se tocan acá
 function existingDocHasCodigo(id){ return !!id && editingExistingCodigo!=null; }
+/* =================== HISTORIAL DE CAMBIOS (lo ve solo el administrador) =================== */
+// Cada edición de una venta o presupuesto (formulario, factura en la planilla, costos) deja un registro en "historial":
+// quién, cuándo y qué cambió (antes → después). Se escribe aparte y sin esperar: nunca impide ni demora guardar.
+const ESTADO_COSTOS_TXT = {'':'sin marcar', falta:'falta', completo:'completo'};
+function registrarHistorial(tipo, docId, clienteId, d, accion, cambios){
+  if(!cambios || !cambios.length || !docId) return;
+  d = d || {};
+  const reg = {docId, clienteId: clienteId||d.clienteId||'', tipo, accion, cambios,
+    codigo: (d.codigo!==undefined && d.codigo!==null)? String(d.codigo) : '',
+    clienta: [d.clienteNombre, d.clienteApellido].filter(Boolean).join(' '),
+    fecha: Date.now(),
+    quien: auth.currentUser? auth.currentUser.email : '', quienNombre: currentUserNombre||'', quienRol: currentUserRole||''};
+  try{ db.collection('historial').doc().set(reg).catch(err=>console.error('historial', err)); }
+  catch(err){ console.error('historial', err); }
+}
+function monTxt(n, moneda){ return moneda==='USD'? fmtUSD(n||0) : fmtARS(n||0); }
+function prendaTextoHist(p, tipo){
+  if(!p) return '';
+  const desc = (p.desc||'').trim() || '(sin descripción)';
+  if(tipo==='presupuesto') return desc+' · '+monTxt(p.efvo, p.moneda);
+  if(p.esArreglo) return desc+' (arreglo) · '+monTxt(p.total, p.moneda);
+  const pv = p.puntoVenta? ' · '+p.puntoVenta : '';
+  return (p.cant||1)+' × '+desc+' · '+monTxt(p.valorUnit, p.moneda)+pv;
+}
+function pagosTextoHist(pagos){
+  return (pagos||[]).filter(p=>!p.pagoDocId).map(p=>{
+    const m = METODOS[p.metodo] || {label:p.metodo||'', moneda:'ARS'};
+    return m.label+' '+monTxt(p.monto, m.moneda)+(p.cotizacion? ' (cotiz. '+fmtMoney(p.cotizacion)+')' : '');
+  }).join(' + ');
+}
+function costosTextoHist(costos){
+  return (costos||[]).map(c=> c.tipo+(c.detalle? ' '+c.detalle : '')+' '+(c.tipo==='Rufina arreglos'? (c.cant+' u.') : (c.cant+' × '+fmtARS(c.valor||0)))).join(' · ');
+}
+function diffDocHistorial(a, b, tipo){
+  const out = [];
+  const add = (campo, x, y)=>{ x = (x==null? '' : String(x)).trim(); y = (y==null? '' : String(y)).trim(); if(x!==y) out.push({campo, antes:x, despues:y}); };
+  add('Fecha', fmtDateCortoAnio(a.fecha), fmtDateCortoAnio(b.fecha));
+  add('Fecha evento', a.fechaEvento, b.fechaEvento);
+  if(tipo==='venta'){
+    add('Código', a.codigo, b.codigo!==undefined? b.codigo : a.codigo);
+    add('Punto de venta', a.puntoVenta, b.puntoVenta);
+  }
+  const pa = (a.productos||[]).map(p=>prendaTextoHist(p,tipo)), pb = (b.productos||[]).map(p=>prendaTextoHist(p,tipo));
+  for(let i=0; i<Math.max(pa.length, pb.length); i++) add('Prenda '+(i+1), pa[i], pb[i]);
+  if(tipo==='venta'){
+    add('Pagos', pagosTextoHist(a.pagos), pagosTextoHist(b.pagos));
+    add('Fecha para saldar deuda', fmtDateCortoAnio(a.fechaPago), fmtDateCortoAnio(b.fechaPago));
+  }
+  add('Nota visible en remito', a.notaRemito, b.notaRemito);
+  add('Nota interna', a.notas, b.notas);
+  add('Medidas', medidasTexto(a.medidas), medidasTexto(b.medidas));
+  add('Fotos', a.fotosCount||0, b.fotosCount!==undefined? b.fotosCount : (a.fotosCount||0));
+  return out;
+}
+function fmtFechaHoraHist(ms){
+  const d = new Date(ms||0);
+  return d.getDate()+'/'+(d.getMonth()+1)+'/'+String(d.getFullYear()).slice(-2)+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}
+async function abrirHistorial(){
+  if(currentUserRole!=='admin') return;
+  const docId = document.getElementById('doc-id').value;
+  if(!docId) return;
+  const cont = document.getElementById('hist-lista');
+  const d = editingExistingDoc || {};
+  document.getElementById('hist-sub').textContent = [(d.tipo||editingDocTipo)==='presupuesto'? 'Presupuesto' : 'Venta', (d.codigo && d.codigo!=='-')? d.codigo : '', [d.clienteNombre, d.clienteApellido].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+  cont.innerHTML = '<div class="hist-vacio">Cargando…</div>';
+  openModal('modal-hist');
+  try{
+    const snap = await db.collection('historial').where('docId','==',docId).get();
+    const arr = []; snap.forEach(x=>arr.push(x.data()));
+    arr.sort((x,y)=>(y.fecha||0)-(x.fecha||0));
+    if(document.getElementById('doc-id').value!==docId) return;
+    cont.innerHTML = arr.length? arr.map(h=>`
+      <div class="hist-item">
+        <div class="hist-cab"><b>${esc(h.quienNombre||h.quien||'—')}</b><span>${esc(fmtFechaHoraHist(h.fecha))}</span><span class="hist-acc">${esc(h.accion||'')}</span></div>
+        ${(h.cambios||[]).map(c=>`<div class="hist-cambio"><div class="hist-campo">${esc(c.campo)}</div><div class="hist-val"><span class="hist-antes">${c.antes? esc(c.antes) : '<i>vacío</i>'}</span> <span class="hist-flecha">→</span> <span class="hist-desp">${c.despues? esc(c.despues) : '<i>vacío</i>'}</span></div></div>`).join('')}
+      </div>`).join('')
+      : '<div class="hist-vacio">Todavía no hay cambios registrados.<br><small>El historial guarda las ediciones hechas desde el 20/11/2026.</small></div>';
+  }catch(err){
+    console.error(err);
+    cont.innerHTML = '<div class="hist-vacio">No se pudo cargar el historial. Revisá la conexión (o que estén publicadas las reglas nuevas de Firebase).</div>';
+  }
+}
 /* =================== FOTOS EN LA NOTA INTERNA (livianas: se achican antes de guardar) =================== */
 const FOTO_MAX = 1, FOTO_LADO = 1000, FOTO_BYTES = 150000;
 let docFotos = [], docFotosBorrar = [], docFotosExistCount = 0, docFotosCargando = false;
@@ -2943,6 +3073,13 @@ function saveCostos(){
 
   const applyAndSave = (productosBase)=>{
     const productos = productosBase.map((p,i)=> i===productoIndex? {...p, costos, estadoCostos, costosInit:true} : p);
+    const pAntes = productosBase[productoIndex] || {};
+    const cambiosC = [];
+    const tA = costosTextoHist(pAntes.costos), tD = costosTextoHist(costos);
+    if(tA!==tD) cambiosC.push({campo:'Costos de "'+(pAntes.desc||'prenda')+'"', antes:tA, despues:tD});
+    if((pAntes.estadoCostos||'')!==(estadoCostos||'')) cambiosC.push({campo:'Estado de costos de "'+(pAntes.desc||'prenda')+'"', antes:ESTADO_COSTOS_TXT[pAntes.estadoCostos||'']||'', despues:ESTADO_COSTOS_TXT[estadoCostos||'']||''});
+    const vRef = ventaSheetDocsRaw.find(x=>x.id===ventaId) || (docsCacheClienteId===clienteId? docsCache.find(x=>x.id===ventaId) : null) || {};
+    registrarHistorial('venta', ventaId, clienteId, vRef, 'Costos', cambiosC);
     // Optimista: se ve reflejado en la planilla al instante; Firestore se escribe en segundo plano.
     closeModal('modal-costos');
     const idx = ventaSheetDocsRaw.findIndex(x=>x.id===ventaId);
@@ -4349,6 +4486,8 @@ function renderVentaFooter(filtered){
 }
 function updateFacturaInline(el){
   const clienteId = el.dataset.clienteId, ventaId = el.dataset.ventaId, factura = el.value.trim();
+  const antesF = ventaSheetDocsRaw.find(x=>x.id===ventaId);
+  if(antesF && (antesF.factura||'')!==factura) registrarHistorial('venta', ventaId, clienteId, antesF, 'Factura', [{campo:'Factura', antes: antesF.factura||'', despues: factura}]);
   // Reflejamos el cambio en memoria para que la planilla no vuelva a mostrar el valor viejo si se vuelve a dibujar.
   el.classList.toggle('saved', !!factura);
   const idxF = ventaSheetDocsRaw.findIndex(x=>x.id===ventaId);
